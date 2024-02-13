@@ -1,8 +1,3 @@
-# key 'a' = move the triangle left
-# key 'd' = move the triangle right
-# key 'f' = shoots
-# key 'space' = pause
-
 
 import random
 import math
