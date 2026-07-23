@@ -47,7 +47,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: QRStudioPro-Build-Diagnostic
-          path: qrstudio-build/build-diagnostic.txt
+          path: |
+            qrstudio-build/build-diagnostic.txt
+            qrstudio-build/*.log
           if-no-files-found: warn
 
       - name: Upload installer
