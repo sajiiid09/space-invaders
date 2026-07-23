@@ -37,10 +37,21 @@ jobs:
           cache-dependency-path: qrstudio-build/requirements.txt
 
       - name: Build and smoke-test standalone app
+        id: native-build
+        continue-on-error: true
         shell: powershell
         run: .\build.ps1
 
+      - name: Upload build diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: QRStudioPro-Build-Diagnostic
+          path: qrstudio-build/build-diagnostic.txt
+          if-no-files-found: warn
+
       - name: Upload installer
+        if: steps.native-build.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: QRStudioPro-Installer
@@ -48,8 +59,14 @@ jobs:
           if-no-files-found: error
 
       - name: Upload portable version
+        if: steps.native-build.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: QRStudioPro-Portable
           path: qrstudio-build/portable-output/QRStudioPro_Portable_v1.0.0.zip
           if-no-files-found: error
+
+      - name: Fail workflow when build failed
+        if: steps.native-build.outcome != 'success'
+        shell: powershell
+        run: throw 'Standalone Windows build failed. See QRStudioPro-Build-Diagnostic artifact.'
