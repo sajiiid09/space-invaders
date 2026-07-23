@@ -50,6 +50,8 @@ jobs:
           path: |
             qrstudio-build/build-diagnostic.txt
             qrstudio-build/*.log
+            qrstudio-build/main.py
+            qrstudio-build/payload/main_07.b64
           if-no-files-found: warn
 
       - name: Upload installer
