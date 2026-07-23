@@ -8,9 +8,18 @@ function Write-Stage([string]$message) {
   Add-Content -Path $diagnosticPath -Value $line
 }
 
-function Assert-NativeSuccess([string]$name) {
-  if ($LASTEXITCODE -ne 0) {
-    throw "$name failed with exit code $LASTEXITCODE."
+function Invoke-LoggedCommand([string]$name, [string]$command, [string]$logFile) {
+  cmd.exe /d /c "$command > `"$logFile`" 2>&1"
+  $exitCode = $LASTEXITCODE
+  if (Test-Path $logFile) {
+    Get-Content $logFile | ForEach-Object { Write-Host $_ }
+  }
+  if ($exitCode -ne 0) {
+    if (Test-Path $logFile) {
+      Add-Content -Path $diagnosticPath -Value "`r`n--- $name output ---"
+      Get-Content $logFile | Add-Content -Path $diagnosticPath
+    }
+    throw "$name failed with exit code $exitCode."
   }
 }
 
@@ -22,31 +31,15 @@ try {
   [IO.File]::WriteAllBytes((Join-Path $PWD 'app_icon.ico'), [Convert]::FromBase64String($iconBase64))
 
   Write-Stage 'Checking Python source syntax'
-  python -m py_compile main.py 2>&1 | Tee-Object -FilePath 'syntax.log'
-  Assert-NativeSuccess 'Python syntax check'
+  Invoke-LoggedCommand 'Python syntax check' 'python -m py_compile main.py' 'syntax.log'
 
   Write-Stage 'Installing build dependencies'
-  python -m pip install --upgrade pip 2>&1 | Tee-Object -FilePath 'pip-upgrade.log'
-  Assert-NativeSuccess 'pip upgrade'
-  python -m pip install -r requirements.txt 2>&1 | Tee-Object -FilePath 'pip-install.log'
-  Assert-NativeSuccess 'Dependency installation'
+  Invoke-LoggedCommand 'pip upgrade' 'python -m pip install --upgrade pip' 'pip-upgrade.log'
+  Invoke-LoggedCommand 'Dependency installation' 'python -m pip install -r requirements.txt' 'pip-install.log'
 
   Write-Stage 'Building standalone Windows application'
-  python -m PyInstaller --noconfirm --clean --windowed --onedir --noupx `
-    --name QRStudioPro `
-    --icon app_icon.ico `
-    --version-file version_info.txt `
-    --add-data "app_icon.ico;." `
-    --collect-all customtkinter `
-    --collect-all flask `
-    --collect-all werkzeug `
-    --hidden-import win32com.client `
-    --hidden-import win32timezone `
-    --hidden-import pythoncom `
-    --hidden-import pywintypes `
-    --hidden-import cryptography `
-    main.py 2>&1 | Tee-Object -FilePath 'pyinstaller.log'
-  Assert-NativeSuccess 'PyInstaller'
+  $pyInstallerCommand = 'python -m PyInstaller --noconfirm --clean --windowed --onedir --noupx --name QRStudioPro --icon app_icon.ico --version-file version_info.txt --add-data "app_icon.ico;." --collect-all customtkinter --collect-all flask --collect-all werkzeug --hidden-import win32com.client --hidden-import win32timezone --hidden-import pythoncom --hidden-import pywintypes --hidden-import cryptography main.py'
+  Invoke-LoggedCommand 'PyInstaller' $pyInstallerCommand 'pyinstaller.log'
 
   Get-ChildItem -Path 'dist' -Recurse -ErrorAction SilentlyContinue | Select-Object FullName,Length | Format-Table -AutoSize | Out-String | Add-Content -Path $diagnosticPath
 
@@ -68,11 +61,12 @@ try {
   Write-Stage 'Creating professional installer'
   $inno = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
   if (-not (Test-Path $inno)) {
-    choco install innosetup -y --no-progress 2>&1 | Tee-Object -FilePath 'inno-install.log'
-    Assert-NativeSuccess 'Inno Setup installation'
+    Invoke-LoggedCommand 'Inno Setup installation' 'choco install innosetup -y --no-progress' 'inno-install.log'
   }
-  & $inno QRStudioPro.iss 2>&1 | Tee-Object -FilePath 'inno-build.log'
-  Assert-NativeSuccess 'Inno Setup compiler'
+  $innoProcess = Start-Process -FilePath $inno -ArgumentList 'QRStudioPro.iss' -NoNewWindow -Wait -PassThru -RedirectStandardOutput 'inno-build.log' -RedirectStandardError 'inno-build-error.log'
+  Get-Content 'inno-build.log' -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_ }
+  Get-Content 'inno-build-error.log' -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_ }
+  if ($innoProcess.ExitCode -ne 0) { throw "Inno Setup compiler failed with exit code $($innoProcess.ExitCode)." }
 
   Write-Stage 'BUILD SUCCESS'
 }
