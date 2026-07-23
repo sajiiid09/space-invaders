@@ -1,0 +1,30 @@
+                logo_pos = ((qr_width - logo_w) // 2, (qr_height - logo_h) // 2)
+                padding = 15
+                bg_w = logo_w + padding
+                bg_h = logo_h + padding
+                bg_pos = ((qr_width - bg_w) // 2, (qr_height - bg_h) // 2)
+                white_bg = Image.new("RGBA", (bg_w, bg_h), "white")
+                img.paste(white_bg, bg_pos) 
+                img.paste(logo, logo_pos, logo) 
+            except Exception as e:
+                pass
+
+        self.current_stealth_image = img
+        img_preview = img.resize((220, 220), Image.LANCZOS)
+        ctk_image = ctk.CTkImage(light_image=img_preview, dark_image=img_preview, size=(220, 220))
+        self.stealth_display.configure(image=ctk_image, text="")
+        
+        downloads_folder = os.path.join(os.path.expanduser('~'), 'Downloads')
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        auto_save_path = os.path.join(downloads_folder, f"QR_Stealth_{timestamp}.png")
+        try:
+            self.current_stealth_image.save(auto_save_path)
+            self.stealth_action_btn.configure(text="Auto-Saved to Downloads", state="normal", text_color="#32CD32") 
+        except:
+            self.stealth_action_btn.configure(text="Manual Save As...", state="normal")
+
+        self.log_action(raw_data, "Stealth QR")
+
+    def export_stealth_qr(self):
+        if not self.current_stealth_image: return
+        path = filedialog.asksaveasfilename(defaultextension=".png", initialfile="Custom_Stealth_QR.png", filetypes=[("PNG files", "*.png")])
