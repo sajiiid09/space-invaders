@@ -1,5 +1,4 @@
 $ErrorActionPreference = 'Stop'
-$PSNativeCommandUseErrorActionPreference = $true
 $env:PYTHONUTF8 = '1'
 $diagnosticPath = Join-Path $PWD 'build-diagnostic.txt'
 
@@ -7,6 +6,12 @@ function Write-Stage([string]$message) {
   $line = "[$(Get-Date -Format o)] $message"
   Write-Host $line
   Add-Content -Path $diagnosticPath -Value $line
+}
+
+function Assert-NativeSuccess([string]$name) {
+  if ($LASTEXITCODE -ne 0) {
+    throw "$name failed with exit code $LASTEXITCODE."
+  }
 }
 
 try {
@@ -17,11 +22,14 @@ try {
   [IO.File]::WriteAllBytes((Join-Path $PWD 'app_icon.ico'), [Convert]::FromBase64String($iconBase64))
 
   Write-Stage 'Checking Python source syntax'
-  python -m py_compile main.py
+  python -m py_compile main.py 2>&1 | Tee-Object -FilePath 'syntax.log'
+  Assert-NativeSuccess 'Python syntax check'
 
   Write-Stage 'Installing build dependencies'
-  python -m pip install --upgrade pip
-  python -m pip install -r requirements.txt
+  python -m pip install --upgrade pip 2>&1 | Tee-Object -FilePath 'pip-upgrade.log'
+  Assert-NativeSuccess 'pip upgrade'
+  python -m pip install -r requirements.txt 2>&1 | Tee-Object -FilePath 'pip-install.log'
+  Assert-NativeSuccess 'Dependency installation'
 
   Write-Stage 'Building standalone Windows application'
   python -m PyInstaller --noconfirm --clean --windowed --onedir --noupx `
@@ -37,7 +45,10 @@ try {
     --hidden-import pythoncom `
     --hidden-import pywintypes `
     --hidden-import cryptography `
-    main.py
+    main.py 2>&1 | Tee-Object -FilePath 'pyinstaller.log'
+  Assert-NativeSuccess 'PyInstaller'
+
+  Get-ChildItem -Path 'dist' -Recurse -ErrorAction SilentlyContinue | Select-Object FullName,Length | Format-Table -AutoSize | Out-String | Add-Content -Path $diagnosticPath
 
   Write-Stage 'Running Windows startup smoke test'
   $exePath = Join-Path $PWD 'dist\QRStudioPro\QRStudioPro.exe'
@@ -57,9 +68,11 @@ try {
   Write-Stage 'Creating professional installer'
   $inno = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
   if (-not (Test-Path $inno)) {
-    choco install innosetup -y --no-progress
+    choco install innosetup -y --no-progress 2>&1 | Tee-Object -FilePath 'inno-install.log'
+    Assert-NativeSuccess 'Inno Setup installation'
   }
-  & $inno QRStudioPro.iss
+  & $inno QRStudioPro.iss 2>&1 | Tee-Object -FilePath 'inno-build.log'
+  Assert-NativeSuccess 'Inno Setup compiler'
 
   Write-Stage 'BUILD SUCCESS'
 }
