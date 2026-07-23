@@ -1,0 +1,38 @@
+        if path: self.current_stealth_image.save(path)
+
+    # ================== LOGIC: FILE DROP SERVER ==================
+    def get_local_ip(self):
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            s.connect(('10.255.255.255', 1))
+            IP = s.getsockname()[0]
+        except Exception:
+            IP = '127.0.0.1'
+        finally:
+            s.close()
+        return IP
+
+    def start_local_server_quietly(self):
+        if not hasattr(self, 'server_thread') or not self.server_thread.is_alive():
+            self.server_thread = threading.Thread(target=lambda: flask_app.run(host='0.0.0.0', port=8080, debug=False, use_reloader=False, threaded=True), daemon=True)
+            self.server_thread.start()
+
+    def start_local_server(self):
+        self.start_local_server_quietly()
+        local_ip = self.get_local_ip()
+        drop_url = f"http://{local_ip}:8080/{DROP_TOKEN}"
+
+        qr = qrcode.QRCode(version=1, box_size=10, border=2)
+        qr.add_data(drop_url)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+
+        img_preview = img.resize((180, 180), Image.LANCZOS)
+        ctk_image = ctk.CTkImage(light_image=img_preview, dark_image=img_preview, size=(180, 180))
+        self.drop_qr_display.configure(image=ctk_image, text="")
+        self.drop_status.configure(text=f"Server Online at: {drop_url}\nWaiting for files...", text_color="#28a745")
+        
+    def open_drop_folder(self):
+        try:
+            os.startfile(UPLOAD_FOLDER)
+        except Exception as e:

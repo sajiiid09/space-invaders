@@ -1,0 +1,35 @@
+ully!")
+
+    def select_logo(self):
+        path = filedialog.askopenfilename(title="Select Center Logo", filetypes=[("Image Files", "*.png;*.jpg;*.jpeg")])
+        if path:
+            self.stealth_logo_path = path
+            self.logo_label.configure(text=f"Selected: {os.path.basename(path)}")
+
+    def generate_stealth_qr(self):
+        raw_data = self.stealth_input.get("1.0", "end-1c")
+        if not raw_data.strip(): return
+
+        qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_H, box_size=15, border=3)
+        qr.add_data(raw_data)
+        qr.make(fit=True)
+        style_choice = self.style_var.get()
+        
+        if style_choice == "Rounded":
+            drawer = RoundedModuleDrawer(radius_ratio=1)
+            img = qr.make_image(image_factory=StyledPilImage, module_drawer=drawer)
+        elif style_choice == "Circle":
+            drawer = CircleModuleDrawer()
+            img = qr.make_image(image_factory=StyledPilImage, module_drawer=drawer)
+        else:
+            img = qr.make_image(fill_color="black", back_color="white")
+
+        img = img.convert("RGBA")
+
+        if hasattr(self, 'stealth_logo_path') and self.stealth_logo_path and os.path.exists(self.stealth_logo_path):
+            try:
+                logo = Image.open(self.stealth_logo_path).convert("RGBA")
+                qr_width, qr_height = img.size
+                max_logo_size = int(qr_width * 0.28)
+                logo.thumbnail((max_logo_size, max_logo_size), Image.LANCZOS)
+                logo_w, logo_h = logo.size

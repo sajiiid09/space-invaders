@@ -1,0 +1,5 @@
+            messagebox.showerror("Error", f"Failed to open folder:\n{e}")
+
+if __name__ == "__main__":
+    app = AdvancedQRStudio()
+    app.mainloop()
