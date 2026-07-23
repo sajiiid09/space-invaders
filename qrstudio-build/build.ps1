@@ -31,7 +31,8 @@ try {
   [IO.File]::WriteAllBytes($mainPath, [Convert]::FromBase64String($prefixBase64))
   $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
   Get-ChildItem -Path 'payload\tail_*.txt' | Sort-Object Name | ForEach-Object {
-    [IO.File]::AppendAllText($mainPath, [IO.File]::ReadAllText($_.FullName), $utf8NoBom)
+    $tailText = [IO.File]::ReadAllText($_.FullName).Replace("`r`n", "`n").Replace("`r", "`n")
+    [IO.File]::AppendAllText($mainPath, $tailText, $utf8NoBom)
   }
   $sourceHash = (Get-FileHash -Algorithm SHA256 $mainPath).Hash.ToLowerInvariant()
   Add-Content -Path $diagnosticPath -Value "Source SHA256: $sourceHash"
