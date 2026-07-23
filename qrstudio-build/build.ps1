@@ -24,7 +24,7 @@ function Invoke-LoggedCommand([string]$name, [string]$command, [string]$logFile)
 }
 
 try {
-  Write-Stage 'Reconstructing verified Python source and icon'
+  Write-Stage 'Reconstructing verified Python source'
   $prefixFiles = 0..6 | ForEach-Object { Join-Path $PWD ("payload\main_{0:D2}.b64" -f $_) }
   $prefixBase64 = ($prefixFiles | ForEach-Object { [IO.File]::ReadAllText($_) }) -join ''
   $mainPath = Join-Path $PWD 'main.py'
@@ -40,9 +40,6 @@ try {
     throw "Reconstructed source checksum mismatch: $sourceHash"
   }
 
-  $iconBase64 = Get-Content 'payload\icon.b64' -Raw
-  [IO.File]::WriteAllBytes((Join-Path $PWD 'app_icon.ico'), [Convert]::FromBase64String($iconBase64))
-
   Write-Stage 'Checking Python source syntax'
   Invoke-LoggedCommand 'Python syntax check' 'python -m py_compile main.py' 'syntax.log'
 
@@ -50,14 +47,12 @@ try {
   Invoke-LoggedCommand 'pip upgrade' 'python -m pip install --upgrade pip' 'pip-upgrade.log'
   Invoke-LoggedCommand 'Dependency installation' 'python -m pip install -r requirements.txt' 'pip-install.log'
 
-  Write-Stage 'Generating multi-resolution installer icon'
-  Invoke-LoggedCommand 'Installer icon generation' 'python make_icon.py' 'icon-generation.log'
+  Write-Stage 'Generating valid multi-resolution icons'
+  Invoke-LoggedCommand 'Icon generation' 'python make_icon.py' 'icon-generation.log'
 
   Write-Stage 'Building standalone Windows application'
   $pyInstallerCommand = 'python -m PyInstaller --noconfirm --clean --windowed --onedir --noupx --name QRStudioPro --icon app_icon.ico --version-file version_info.txt --add-data "app_icon.ico;." --collect-all customtkinter --collect-all flask --collect-all werkzeug --hidden-import win32com.client --hidden-import win32timezone --hidden-import pythoncom --hidden-import pywintypes --hidden-import cryptography main.py'
   Invoke-LoggedCommand 'PyInstaller' $pyInstallerCommand 'pyinstaller.log'
-
-  Get-ChildItem -Path 'dist' -Recurse -ErrorAction SilentlyContinue | Select-Object FullName,Length | Format-Table -AutoSize | Out-String | Add-Content -Path $diagnosticPath
 
   Write-Stage 'Running Windows startup smoke test'
   $exePath = Join-Path $PWD 'dist\QRStudioPro\QRStudioPro.exe'
