@@ -50,6 +50,9 @@ try {
   Invoke-LoggedCommand 'pip upgrade' 'python -m pip install --upgrade pip' 'pip-upgrade.log'
   Invoke-LoggedCommand 'Dependency installation' 'python -m pip install -r requirements.txt' 'pip-install.log'
 
+  Write-Stage 'Generating multi-resolution installer icon'
+  Invoke-LoggedCommand 'Installer icon generation' 'python make_icon.py' 'icon-generation.log'
+
   Write-Stage 'Building standalone Windows application'
   $pyInstallerCommand = 'python -m PyInstaller --noconfirm --clean --windowed --onedir --noupx --name QRStudioPro --icon app_icon.ico --version-file version_info.txt --add-data "app_icon.ico;." --collect-all customtkinter --collect-all flask --collect-all werkzeug --hidden-import win32com.client --hidden-import win32timezone --hidden-import pythoncom --hidden-import pywintypes --hidden-import cryptography main.py'
   Invoke-LoggedCommand 'PyInstaller' $pyInstallerCommand 'pyinstaller.log'
