@@ -1,0 +1,55 @@
+name: Build QR Studio Pro Windows
+
+on:
+  push:
+    branches:
+      - qr-studio-pro-build
+    paths:
+      - 'qrstudio-build/**'
+      - '.github/workflows/qrstudio-build.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'qrstudio-build/**'
+      - '.github/workflows/qrstudio-build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: qrstudio-build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: 'x64'
+          cache: 'pip'
+          cache-dependency-path: qrstudio-build/requirements.txt
+
+      - name: Build and smoke-test standalone app
+        shell: powershell
+        run: .\build.ps1
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: QRStudioPro-Installer
+          path: qrstudio-build/installer-output/QRStudioPro_Setup_v1.0.0.exe
+          if-no-files-found: error
+
+      - name: Upload portable version
+        uses: actions/upload-artifact@v4
+        with:
+          name: QRStudioPro-Portable
+          path: qrstudio-build/portable-output/QRStudioPro_Portable_v1.0.0.zip
+          if-no-files-found: error
