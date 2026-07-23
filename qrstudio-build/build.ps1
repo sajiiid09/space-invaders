@@ -24,9 +24,21 @@ function Invoke-LoggedCommand([string]$name, [string]$command, [string]$logFile)
 }
 
 try {
-  Write-Stage 'Reconstructing Python source and icon'
-  $mainBase64 = (Get-ChildItem -Path 'payload\main_*.b64' | Sort-Object Name | ForEach-Object { Get-Content $_.FullName -Raw }) -join ''
-  [IO.File]::WriteAllBytes((Join-Path $PWD 'main.py'), [Convert]::FromBase64String($mainBase64))
+  Write-Stage 'Reconstructing verified Python source and icon'
+  $prefixFiles = 0..6 | ForEach-Object { Join-Path $PWD ("payload\main_{0:D2}.b64" -f $_) }
+  $prefixBase64 = ($prefixFiles | ForEach-Object { [IO.File]::ReadAllText($_) }) -join ''
+  $mainPath = Join-Path $PWD 'main.py'
+  [IO.File]::WriteAllBytes($mainPath, [Convert]::FromBase64String($prefixBase64))
+  $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+  Get-ChildItem -Path 'payload\tail_*.txt' | Sort-Object Name | ForEach-Object {
+    [IO.File]::AppendAllText($mainPath, [IO.File]::ReadAllText($_.FullName), $utf8NoBom)
+  }
+  $sourceHash = (Get-FileHash -Algorithm SHA256 $mainPath).Hash.ToLowerInvariant()
+  Add-Content -Path $diagnosticPath -Value "Source SHA256: $sourceHash"
+  if ($sourceHash -ne '4f4175abb862c6547c013c4d4b99171f71082008beabf894aa429889357dc695') {
+    throw "Reconstructed source checksum mismatch: $sourceHash"
+  }
+
   $iconBase64 = Get-Content 'payload\icon.b64' -Raw
   [IO.File]::WriteAllBytes((Join-Path $PWD 'app_icon.ico'), [Convert]::FromBase64String($iconBase64))
 
